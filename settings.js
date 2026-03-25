@@ -43,7 +43,7 @@ global.APIKeys = {
     'https://api.botcahx.eu.org': 'THERESA'
 }
 global.APIHeaders = {
-    "https://ytdlpyton.nvlgroup.my.id": "X-API-Key"
+    "https://ytdlpyton.nvlgroup.my.id": "X-API-Key: kydLP"
 };
 global.loading = (m, conn, back = false) => {
     if (!back) {
