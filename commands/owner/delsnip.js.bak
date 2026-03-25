@@ -1,0 +1,108 @@
+import fetch from "node-fetch";
+
+const OWNER = "Apocalypsev";
+const REPO = "snippet";
+const FILE_PATH = "db.json";
+
+async function getFile() {
+    if (!global.tokengh2) throw new Error("Token GitHub belum diatur");
+
+    const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`;
+
+    const res = await fetch(url, {
+        headers: {
+            Authorization: `token ${global.tokengh2}`,
+            "User-Agent": "WhatsApp-Bot",
+        },
+    });
+
+    if (!res.ok) throw new Error("Gagal mengambil file");
+    return await res.json();
+}
+
+function normalize(db) {
+    if (Array.isArray(db)) return {
+        data: db,
+        wrap: false
+    };
+    if (Array.isArray(db.snippets)) return {
+        data: db.snippets,
+        wrap: true
+    };
+    return {
+        data: [],
+        wrap: false
+    };
+}
+
+const handler = async (m, {
+    args
+}) => {
+    const queryRaw = args.join(" ").trim() || m.quoted?.text?.trim();
+
+    if (!queryRaw)
+        return m.reply(
+            "◦❒ Gunakan:\n" +
+            ".delsnip <id atau judul>\n" +
+            "atau reply pesan berisi ID snippet"
+        );
+
+    let file;
+    try {
+        file = await getFile();
+    } catch {
+        return m.reply("◦❒ ❌ Gagal mengambil database snippet");
+    }
+
+    const db = JSON.parse(Buffer.from(file.content, "base64").toString());
+    const {
+        data,
+        wrap
+    } = normalize(db);
+
+    const index = data.findIndex(
+        v =>
+        v.id.toLowerCase() === queryRaw.toLowerCase() ||
+        v.title.toLowerCase() === queryRaw.toLowerCase()
+    );
+
+    if (index === -1) return m.reply("◦❒ ❌ Snippet tidak ditemukan");
+
+    const deleted = data.splice(index, 1)[0]; // hapus snippet
+
+    const updated = wrap ? {
+        snippets: data
+    } : data;
+
+    const updateRes = await fetch(
+        `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`, {
+            method: "PUT",
+            headers: {
+                Authorization: `token ${global.tokengh2}`,
+                "Content-Type": "application/json",
+                "User-Agent": "WhatsApp-Bot",
+            },
+            body: JSON.stringify({
+                message: `delete snippet: ${deleted.title}`,
+                content: Buffer.from(JSON.stringify(updated, null, 2)).toString("base64"),
+                sha: file.sha,
+            }),
+        }
+    );
+
+    if (!updateRes.ok) return m.reply("◦❒ ❌ Gagal menghapus snippet");
+
+    m.reply(
+        "◦❒ ✅ Snippet berhasil dihapus\n" +
+        `◦❒ Judul: ${deleted.title}\n` +
+        `◦❒ ID: ${deleted.id}`
+    );
+};
+
+handler.help = ["delsnip <id/judul>"];
+handler.tags = ["snippet"];
+handler.command = /^delsnip|removesnip$/i;
+handler.owner = true;
+handler.description = "◦❒ Menghapus snippet dari database GitHub berdasarkan ID atau judul";
+
+export default handler;
